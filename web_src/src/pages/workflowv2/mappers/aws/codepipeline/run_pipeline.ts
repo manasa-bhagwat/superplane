@@ -49,7 +49,6 @@ export const runPipelineMapper: ComponentBaseMapper = {
       eventSections: lastExecution ? getEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getMetadataList(context.node),
-      specs: getSpecs(context.node),
       eventStateMap: getStateMap(componentName),
     };
   },
@@ -100,23 +99,6 @@ function getMetadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function getSpecs(node: NodeInfo): ComponentBaseSpec[] {
-  const specs: ComponentBaseSpec[] = [];
-  const configuration = node.configuration as RunPipelineConfiguration | undefined;
-
-  if (configuration?.pipeline) {
-    specs.push({
-      title: "pipeline",
-      tooltipTitle: "pipeline",
-      iconSlug: "play",
-      value: configuration.pipeline,
-      contentType: "text",
-    });
-  }
-
-  return specs;
 }
 
 function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
