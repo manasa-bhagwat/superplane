@@ -31,7 +31,7 @@ import { deleteTopicMapper } from "./sns/delete_topic";
 import { getSubscriptionMapper } from "./sns/get_subscription";
 import { getTopicMapper } from "./sns/get_topic";
 import { publishMessageMapper } from "./sns/publish_message";
-import { runPipelineMapper } from "./codepipeline/run_pipeline";
+import { RUN_PIPELINE_STATE_REGISTRY, runPipelineMapper } from "./codepipeline/run_pipeline";
 import { onImageTriggerRenderer } from "./ec2/on_image";
 import { createImageMapper } from "./ec2/create_image";
 import { getImageMapper as getEc2ImageMapper } from "./ec2/get_image";
@@ -94,7 +94,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
-  "codepipeline.runPipeline": buildActionStateRegistry("started"),
+  "codepipeline.runPipeline": RUN_PIPELINE_STATE_REGISTRY,
   "ecs.createService": buildActionStateRegistry("created"),
   "ecs.describeService": buildActionStateRegistry("described"),
   "ecs.executeCommand": buildActionStateRegistry("executed"),

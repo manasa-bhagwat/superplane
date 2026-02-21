@@ -1,18 +1,27 @@
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
+  EventStateRegistry,
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
   OutputPayload,
+  StateFunction,
   SubtitleContext,
 } from "../../types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
+import {
+  ComponentBaseProps,
+  DEFAULT_EVENT_STATE_MAP,
+  EventSection,
+  EventState,
+  EventStateMap,
+} from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getTriggerRenderer } from "../..";
 import { MetadataItem } from "@/ui/metadataList";
 import { formatTimeAgo } from "@/utils/date";
 import { stringOrDash } from "../../utils";
+import { defaultStateFunction } from "../../stateRegistry";
 import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
 
 interface RunPipelineConfiguration {
@@ -35,10 +44,37 @@ interface RunPipelineOutput {
   };
 }
 
+export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
+  ...DEFAULT_EVENT_STATE_MAP,
+  passed: DEFAULT_EVENT_STATE_MAP.success,
+  failed: {
+    icon: "circle-x",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-400",
+  },
+};
+
+export const runPipelineStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
+  if (!execution) return "neutral";
+
+  const outputs = execution.outputs as { failed?: OutputPayload[] } | undefined;
+  if (outputs?.failed && outputs.failed.length > 0) {
+    return "failed";
+  }
+
+  const state = defaultStateFunction(execution);
+  return state === "success" ? "passed" : state;
+};
+
+export const RUN_PIPELINE_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: RUN_PIPELINE_STATE_MAP,
+  getState: runPipelineStateFunction,
+};
+
 export const runPipelineMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const componentName = context.componentDefinition.name || "unknown";
 
     return {
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
@@ -46,10 +82,10 @@ export const runPipelineMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getMetadataList(context.node),
-      eventStateMap: getStateMap(componentName),
+      eventStateMap: RUN_PIPELINE_STATE_MAP,
     };
   },
 
@@ -101,7 +137,7 @@ function getMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
@@ -111,7 +147,7 @@ function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo, component
       receivedAt: new Date(execution.createdAt ?? 0),
       eventTitle: title,
       eventSubtitle: formatTimeAgo(new Date(execution.createdAt ?? 0)),
-      eventState: getState(componentName)(execution),
+      eventState: runPipelineStateFunction(execution),
       eventId: execution.rootEvent?.id ?? "",
     },
   ];
