@@ -20,3 +20,17 @@ func (r *RunPipeline) ExampleOutput() map[string]any {
 		&exampleOutputRunPipeline,
 	)
 }
+
+//go:embed example_output_get_pipeline_execution.json
+var exampleOutputGetPipelineExecutionBytes []byte
+
+var exampleOutputGetPipelineExecutionOnce sync.Once
+var exampleOutputGetPipelineExecution map[string]any
+
+func (c *GetPipelineExecution) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetPipelineExecutionOnce,
+		exampleOutputGetPipelineExecutionBytes,
+		&exampleOutputGetPipelineExecution,
+	)
+}
