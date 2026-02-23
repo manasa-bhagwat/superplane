@@ -33,6 +33,7 @@ import { getTopicMapper } from "./sns/get_topic";
 import { publishMessageMapper } from "./sns/publish_message";
 import { getPipelineExecutionMapper } from "./codepipeline/get_pipeline_execution";
 import { RUN_PIPELINE_STATE_REGISTRY, runPipelineMapper } from "./codepipeline/run_pipeline";
+import { getPipelineMapper } from "./codepipeline/get_pipeline";
 import { onImageTriggerRenderer } from "./ec2/on_image";
 import { createImageMapper } from "./ec2/create_image";
 import { getImageMapper as getEc2ImageMapper } from "./ec2/get_image";
@@ -44,6 +45,7 @@ import { enableImageDeprecationMapper } from "./ec2/enable_image_deprecation";
 import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
+  "codepipeline.getPipeline": getPipelineMapper,
   "codepipeline.getPipelineExecution": getPipelineExecutionMapper,
   "codepipeline.runPipeline": runPipelineMapper,
   "lambda.runFunction": runFunctionMapper,
@@ -96,6 +98,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
+  "codepipeline.getPipeline": buildActionStateRegistry("retrieved"),
   "codepipeline.getPipelineExecution": buildActionStateRegistry("retrieved"),
   "codepipeline.runPipeline": RUN_PIPELINE_STATE_REGISTRY,
   "ecs.createService": buildActionStateRegistry("created"),

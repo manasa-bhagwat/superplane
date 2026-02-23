@@ -148,9 +148,9 @@ func (c *GetPipelineExecution) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to get AWS credentials: %w", err)
 	}
 
-	client := NewClient(ctx.HTTP, credentials, spec.Region)
+	client := NewClient(ctx.HTTP, credentials, strings.TrimSpace(spec.Region))
 
-	response, err := client.GetPipelineExecutionDetails(spec.Pipeline, spec.ExecutionID)
+	response, err := client.GetPipelineExecutionDetails(strings.TrimSpace(spec.Pipeline), strings.TrimSpace(spec.ExecutionID))
 	if err != nil {
 		return fmt.Errorf("failed to get pipeline execution: %w", err)
 	}
