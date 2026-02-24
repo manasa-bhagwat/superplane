@@ -255,10 +255,7 @@ func (p *OnPipeline) OnIntegrationMessage(ctx core.IntegrationMessageContext) er
 		return fmt.Errorf("failed to decode message: %w", err)
 	}
 
-	region := strings.TrimSpace(metadata.Region)
-	if region == "" {
-		region = strings.TrimSpace(config.Region)
-	}
+	region := metadata.Region
 
 	if region != "" && event.Region != region {
 		ctx.Logger.Infof("Skipping event for region %s, expected %s", event.Region, region)
@@ -266,12 +263,12 @@ func (p *OnPipeline) OnIntegrationMessage(ctx core.IntegrationMessageContext) er
 	}
 
 	pipeline, ok := event.Detail["pipeline"].(string)
-	if !ok || strings.TrimSpace(pipeline) == "" {
+	if !ok || pipeline == "" {
 		return fmt.Errorf("missing pipeline name in event")
 	}
 
 	state, ok := event.Detail["state"].(string)
-	if !ok || strings.TrimSpace(state) == "" {
+	if !ok || state == "" {
 		return fmt.Errorf("missing pipeline state in event")
 	}
 	// Normalize event spelling variants (e.g. CANCELLED -> CANCELED).

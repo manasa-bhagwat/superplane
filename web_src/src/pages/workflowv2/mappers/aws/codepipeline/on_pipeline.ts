@@ -14,6 +14,7 @@ interface OnPipelineConfiguration {
 
 interface PipelineExecutionEvent {
   account?: string;
+  time?: string;
   region?: string;
   detail?: {
     pipeline?: string;
@@ -68,6 +69,7 @@ export const onPipelineTriggerRenderer: TriggerRenderer = {
       Pipeline: stringOrDash(detail?.pipeline),
       State: stringOrDash(detail?.state),
       "Execution ID": stringOrDash(detail?.["execution-id"]),
+      Timestamp: stringOrDash(eventData?.time),
       Region: stringOrDash(eventData?.region),
       Account: stringOrDash(eventData?.account),
     };
