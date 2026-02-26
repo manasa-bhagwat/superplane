@@ -186,6 +186,43 @@ func (c *Client) ListPipelines() ([]PipelineSummary, error) {
 	return pipelines, nil
 }
 
+type PipelineExecutionSummary struct {
+	PipelineExecutionID string `json:"pipelineExecutionId"`
+	Status              string `json:"status"`
+}
+
+type ListPipelineExecutionsResponse struct {
+	PipelineExecutionSummaries []PipelineExecutionSummary `json:"pipelineExecutionSummaries"`
+	NextToken                  string                     `json:"nextToken"`
+}
+
+func (c *Client) ListPipelineExecutionSummaries(pipelineName string) ([]PipelineExecutionSummary, error) {
+	summaries := []PipelineExecutionSummary{}
+	nextToken := ""
+
+	for {
+		payload := map[string]any{
+			"pipelineName": pipelineName,
+		}
+		if nextToken != "" {
+			payload["nextToken"] = nextToken
+		}
+
+		var response ListPipelineExecutionsResponse
+		if err := c.postJSON("ListPipelineExecutions", payload, &response); err != nil {
+			return nil, err
+		}
+
+		summaries = append(summaries, response.PipelineExecutionSummaries...)
+		if response.NextToken == "" {
+			break
+		}
+		nextToken = response.NextToken
+	}
+
+	return summaries, nil
+}
+
 func (c *Client) postJSON(action string, payload any, out any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {

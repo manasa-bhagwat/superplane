@@ -20,18 +20,18 @@ const (
 )
 
 type RetryStageExecutionSpec struct {
-	Region              string `json:"region" mapstructure:"region"`
-	Pipeline            string `json:"pipeline" mapstructure:"pipeline"`
-	Stage               string `json:"stage" mapstructure:"stage"`
-	PipelineExecutionID string `json:"pipelineExecutionId" mapstructure:"pipelineExecutionId"`
-	RetryMode           string `json:"retryMode" mapstructure:"retryMode"`
+	Region            string `json:"region" mapstructure:"region"`
+	Pipeline          string `json:"pipeline" mapstructure:"pipeline"`
+	Stage             string `json:"stage" mapstructure:"stage"`
+	PipelineExecution string `json:"pipelineExecution" mapstructure:"pipelineExecution"`
+	RetryMode         string `json:"retryMode" mapstructure:"retryMode"`
 }
 
 func normalizeRetryStageExecutionSpec(spec *RetryStageExecutionSpec) {
 	spec.Region = strings.TrimSpace(spec.Region)
 	spec.Pipeline = strings.TrimSpace(spec.Pipeline)
 	spec.Stage = strings.TrimSpace(spec.Stage)
-	spec.PipelineExecutionID = strings.TrimSpace(spec.PipelineExecutionID)
+	spec.PipelineExecution = strings.TrimSpace(spec.PipelineExecution)
 	spec.RetryMode = strings.TrimSpace(spec.RetryMode)
 }
 
@@ -61,7 +61,7 @@ func (c *RetryStageExecution) Documentation() string {
 - **Region**: AWS region where the pipeline exists
 - **Pipeline**: Pipeline name
 - **Stage**: Stage name to retry
-- **Pipeline Execution ID**: Source execution ID to retry from
+- **Pipeline Execution**: Source execution to retry from
 - **Retry Mode**: Choose between failed actions only or all actions
 
 ## Output
@@ -126,18 +126,68 @@ func (c *RetryStageExecution) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "stage",
-			Label:       "Stage",
-			Type:        configuration.FieldTypeString,
+			Name:        "pipelineExecution",
+			Label:       "Pipeline Execution",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Stage name to retry (supports expressions)",
+			Description: "Pipeline execution to retry",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "codepipeline.pipelineExecution",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+						{
+							Name: "pipeline",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "pipeline",
+							},
+						},
+					},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "pipeline",
+					Values: []string{"*"},
+				},
+			},
 		},
 		{
-			Name:        "pipelineExecutionId",
-			Label:       "Pipeline Execution ID",
-			Type:        configuration.FieldTypeString,
+			Name:        "stage",
+			Label:       "Stage",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Pipeline execution ID to retry (supports expressions)",
+			Description: "Stage to retry",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "codepipeline.stage",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+						{
+							Name: "pipeline",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "pipeline",
+							},
+						},
+					},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "pipeline",
+					Values: []string{"*"},
+				},
+			},
 		},
 		{
 			Name:     "retryMode",
@@ -173,8 +223,8 @@ func (c *RetryStageExecution) Setup(ctx core.SetupContext) error {
 	if spec.Stage == "" {
 		return fmt.Errorf("stage is required")
 	}
-	if spec.PipelineExecutionID == "" {
-		return fmt.Errorf("pipeline execution ID is required")
+	if spec.PipelineExecution == "" {
+		return fmt.Errorf("pipeline execution is required")
 	}
 	if spec.RetryMode == "" {
 		return fmt.Errorf("retry mode is required")
@@ -204,7 +254,7 @@ func (c *RetryStageExecution) Execute(ctx core.ExecutionContext) error {
 
 	client := NewClient(ctx.HTTP, credentials, spec.Region)
 
-	response, err := client.RetryStageExecution(spec.Pipeline, spec.Stage, spec.PipelineExecutionID, spec.RetryMode)
+	response, err := client.RetryStageExecution(spec.Pipeline, spec.Stage, spec.PipelineExecution, spec.RetryMode)
 	if err != nil {
 		return fmt.Errorf("failed to retry stage execution: %w", err)
 	}
@@ -214,7 +264,7 @@ func (c *RetryStageExecution) Execute(ctx core.ExecutionContext) error {
 			"name":              spec.Pipeline,
 			"stage":             spec.Stage,
 			"retryMode":         spec.RetryMode,
-			"sourceExecutionId": spec.PipelineExecutionID,
+			"sourceExecutionId": spec.PipelineExecution,
 			"newExecutionId":    response.PipelineExecutionID,
 		},
 	}

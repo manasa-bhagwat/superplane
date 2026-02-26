@@ -27,7 +27,7 @@ func Test__RetryStageExecution__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"pipeline":            "my-pipeline",
 				"stage":               "Deploy",
-				"pipelineExecutionId": "old-exec-123",
+				"pipelineExecution":   "old-exec-123",
 				"retryMode":           "FAILED_ACTIONS",
 			},
 		})
@@ -39,7 +39,7 @@ func Test__RetryStageExecution__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"region":              "us-east-1",
 				"stage":               "Deploy",
-				"pipelineExecutionId": "old-exec-123",
+				"pipelineExecution":   "old-exec-123",
 				"retryMode":           "FAILED_ACTIONS",
 			},
 		})
@@ -51,14 +51,14 @@ func Test__RetryStageExecution__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"region":              "us-east-1",
 				"pipeline":            "my-pipeline",
-				"pipelineExecutionId": "old-exec-123",
+				"pipelineExecution":   "old-exec-123",
 				"retryMode":           "FAILED_ACTIONS",
 			},
 		})
 		require.ErrorContains(t, err, "stage is required")
 	})
 
-	t.Run("missing pipeline execution id -> error", func(t *testing.T) {
+	t.Run("missing pipeline execution -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"region":    "us-east-1",
@@ -67,7 +67,7 @@ func Test__RetryStageExecution__Setup(t *testing.T) {
 				"retryMode": "FAILED_ACTIONS",
 			},
 		})
-		require.ErrorContains(t, err, "pipeline execution ID is required")
+		require.ErrorContains(t, err, "pipeline execution is required")
 	})
 
 	t.Run("invalid retry mode -> error", func(t *testing.T) {
@@ -76,7 +76,7 @@ func Test__RetryStageExecution__Setup(t *testing.T) {
 				"region":              "us-east-1",
 				"pipeline":            "my-pipeline",
 				"stage":               "Deploy",
-				"pipelineExecutionId": "old-exec-123",
+				"pipelineExecution":   "old-exec-123",
 				"retryMode":           "INVALID",
 			},
 		})
@@ -89,7 +89,7 @@ func Test__RetryStageExecution__Setup(t *testing.T) {
 				"region":              "us-east-1",
 				"pipeline":            "my-pipeline",
 				"stage":               "Deploy",
-				"pipelineExecutionId": "old-exec-123",
+				"pipelineExecution":   "old-exec-123",
 				"retryMode":           "FAILED_ACTIONS",
 			},
 		})
@@ -114,7 +114,7 @@ func Test__RetryStageExecution__Execute(t *testing.T) {
 				"region":              "us-east-1",
 				"pipeline":            "my-pipeline",
 				"stage":               "Deploy",
-				"pipelineExecutionId": "old-exec-123",
+				"pipelineExecution":   "old-exec-123",
 				"retryMode":           "FAILED_ACTIONS",
 			},
 			Integration:    &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{}},
@@ -138,7 +138,7 @@ func Test__RetryStageExecution__Execute(t *testing.T) {
 				"region":              "us-east-1",
 				"pipeline":            "my-pipeline",
 				"stage":               "Deploy",
-				"pipelineExecutionId": "old-exec-123",
+				"pipelineExecution":   "old-exec-123",
 				"retryMode":           "FAILED_ACTIONS",
 			},
 			HTTP:           httpContext,
@@ -168,7 +168,7 @@ func Test__RetryStageExecution__Execute(t *testing.T) {
 				"region":              "us-east-1",
 				"pipeline":            "my-pipeline",
 				"stage":               "Deploy",
-				"pipelineExecutionId": "old-exec-123",
+				"pipelineExecution":   "old-exec-123",
 				"retryMode":           "FAILED_ACTIONS",
 			},
 			HTTP:           httpContext,
@@ -227,7 +227,7 @@ func Test__RetryStageExecution__Metadata(t *testing.T) {
 	assert.True(t, fieldsByName["region"])
 	assert.True(t, fieldsByName["pipeline"])
 	assert.True(t, fieldsByName["stage"])
-	assert.True(t, fieldsByName["pipelineExecutionId"])
+	assert.True(t, fieldsByName["pipelineExecution"])
 	assert.True(t, fieldsByName["retryMode"])
 
 	channels := component.OutputChannels(nil)

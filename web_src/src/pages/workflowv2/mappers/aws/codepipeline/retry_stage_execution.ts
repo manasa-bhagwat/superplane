@@ -19,7 +19,7 @@ interface RetryStageExecutionConfiguration {
   region?: string;
   pipeline?: string;
   stage?: string;
-  pipelineExecutionId?: string;
+  pipelineExecution?: string;
   retryMode?: string;
 }
 
