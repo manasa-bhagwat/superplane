@@ -23,7 +23,12 @@ import {
   canvasesUpdateNodePause,
   OrganizationsIntegration,
 } from "@/api-client";
-import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import {
+  useOrganizationAgentSettings,
+  useOrganizationGroups,
+  useOrganizationRoles,
+  useOrganizationUsers,
+} from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -37,11 +42,14 @@ import {
   useUpdateCanvas,
   useCanvas,
   useCanvasEvents,
+  useCanvasMemoryEntries,
+  useDeleteCanvasMemoryEntry,
   useWidgets,
   canvasKeys,
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
+import { AiCanvasOperation } from "@/ui/BuildingBlocksSidebar";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import {
   CANVAS_SIDEBAR_STORAGE_KEY,
@@ -77,10 +85,13 @@ import {
   getStateMap,
 } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
+import { CanvasMemoryView } from "./CanvasMemoryView";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
+import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
+import { applyHorizontalAutoLayout } from "./autoLayout";
 import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
@@ -137,7 +148,16 @@ export function WorkflowPageV2() {
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!);
+  const {
+    data: canvasMemoryEntries = [],
+    isLoading: canvasMemoryLoading,
+    error: canvasMemoryError,
+  } = useCanvasMemoryEntries(canvasId!);
+  const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
+  const canReadOrg = canAct("org", "read");
+  const { data: agentSettings } = useOrganizationAgentSettings(organizationId || "", !!organizationId && canReadOrg);
   const canUpdateCanvas = canAct("canvases", "update");
+  const showAiBuilderTab = agentSettings?.agentModeEnabled ?? false;
 
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
@@ -146,6 +166,7 @@ export function WorkflowPageV2() {
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely;
   const isDev = import.meta.env.DEV;
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "memory">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const createWorkflowMutation = useCreateCanvas(organizationId!);
 
@@ -1824,6 +1845,46 @@ export function WorkflowPageV2() {
     ],
   );
 
+  const handleApplyAiOperations = useCallback(
+    async (operations: AiCanvasOperation[]) => {
+      if (!operations.length || !organizationId || !canvasId) {
+        return;
+      }
+
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+      if (!latestWorkflow) {
+        throw new Error("Canvas not found.");
+      }
+
+      saveWorkflowSnapshot(latestWorkflow);
+      const updatedWorkflow = applyAiOperationsToWorkflow({
+        workflow: latestWorkflow,
+        operations,
+        buildingBlocks,
+      });
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      buildingBlocks,
+      canAutoSave,
+      canvas,
+      canvasId,
+      handleSaveWorkflow,
+      markUnsavedChange,
+      organizationId,
+      queryClient,
+      saveWorkflowSnapshot,
+    ],
+  );
+
   const handlePlaceholderAdd = useCallback(
     async (data: {
       position: { x: number; y: number };
@@ -2259,6 +2320,45 @@ export function WorkflowPageV2() {
       debouncedAutoSave,
       canAutoSave,
       saveWorkflowSnapshot,
+      markUnsavedChange,
+    ],
+  );
+
+  const handleAutoLayout = useCallback(
+    async (selectedNodeIDs: string[] = []) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      try {
+        if (!canAutoSave) {
+          saveWorkflowSnapshot(latestWorkflow);
+        }
+
+        const updatedWorkflow = await applyHorizontalAutoLayout(latestWorkflow, {
+          nodeIds: selectedNodeIDs,
+        });
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+        if (canAutoSave) {
+          await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        } else {
+          markUnsavedChange("position");
+        }
+      } catch (error) {
+        console.error("Failed to auto layout canvas", error);
+        showErrorToast("Failed to auto layout canvas");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      canAutoSave,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
       markUnsavedChange,
     ],
   );
@@ -2779,8 +2879,17 @@ export function WorkflowPageV2() {
       } = onRun ? { onRun } : {};
       if (integration) context.integration = integration;
 
-      return () => {
-        return renderer.render(buildNodeInfo(node), Object.keys(context).length > 0 ? context : undefined);
+      // Return a function that takes the current configuration
+      return (configuration?: Record<string, unknown>) => {
+        const nodeWithConfiguration = {
+          ...node,
+          configuration: configuration ?? node.configuration,
+        };
+
+        return renderer.render(
+          buildNodeInfo(nodeWithConfiguration),
+          Object.keys(context).length > 0 ? context : undefined,
+        );
       };
     },
     [canvas],
@@ -2912,9 +3021,21 @@ export function WorkflowPageV2() {
         }}
         title={canvas?.metadata?.name || "Canvas"}
         headerBanner={headerBanner}
+        topViewMode={topViewMode}
+        onTopViewModeChange={setTopViewMode}
+        dataViewContent={
+          <CanvasMemoryView
+            entries={canvasMemoryEntries}
+            isLoading={canvasMemoryLoading}
+            errorMessage={canvasMemoryError instanceof Error ? canvasMemoryError.message : undefined}
+            onDeleteEntry={canUpdateCanvas ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined}
+            deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
+          />
+        }
         nodes={nodes}
         edges={edges}
         organizationId={organizationId}
+        canvasId={canvasId}
         onDirty={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
         getSidebarData={getSidebarData}
         loadSidebarData={loadSidebarData}
@@ -2929,6 +3050,7 @@ export function WorkflowPageV2() {
         onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
         onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
         onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
+        onAutoLayout={!isReadOnly ? handleAutoLayout : undefined}
         onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
         onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
         onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
@@ -2938,7 +3060,9 @@ export function WorkflowPageV2() {
         onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
         onConfigure={!isReadOnly ? handleConfigure : undefined}
         buildingBlocks={buildingBlocks}
+        showAiBuilderTab={showAiBuilderTab}
         onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
+        onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
         onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
         onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
         integrations={canReadIntegrations ? integrations : []}
